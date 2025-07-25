@@ -171,7 +171,7 @@ async def check_aircraft_states():
     if api_response.status_code != 200:
         print(f"Open Sky API request failed: {api_response.status_code} - {api_response.text}")
         return
-
+    print("Open Sky API request successful")
     data = api_response.json()
     if data.get("states") is None:
         return
