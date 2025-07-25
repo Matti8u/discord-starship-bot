@@ -1,10 +1,3 @@
-import sys
-
-print("Python version:", sys.version)
-
-raise SystemExit("Early exit – just checking Python version.")
-
-
 import discord
 from discord import app_commands
 from discord.ext import tasks, commands
@@ -15,8 +8,6 @@ import json
 from dotenv import load_dotenv
 from keep_alive import keep_alive
 from typing import cast
-import sys
-print(sys.version)
 
 keep_alive()
 load_dotenv()
