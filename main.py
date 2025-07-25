@@ -67,7 +67,7 @@ tree = bot.tree
 async def dm_owner_setup_message(guild: discord.Guild):
     try:
         # cast so Pyright knows this method exists
-        owner = await bot.fetch_user(guild.owner_id)
+        owner = await bot.fetch_user(guild.owner_id)# type: ignore
         await owner.send(
             f"👋 Hi! I noticed you haven't set a channel for aircraft alerts in **{guild.name}** yet.\n"
             "Please run the `/setchannel` command in the channel you want me to post alerts to."
