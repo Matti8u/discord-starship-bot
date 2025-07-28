@@ -21,8 +21,6 @@ if DISCORD_TOKEN is None:
 if CLIENT_ID is None or CLIENT_SECRET is None:
     raise ValueError("CLIENT_ID or CLIENT_SECRET environment variable not set.")
 
-print(DISCORD_TOKEN)
-
 CONFIG_PATH = "channel_config.json"
 
 print("Bot script started", flush=True)
@@ -66,6 +64,51 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
+@tasks.loop(seconds=90)
+async def check_aircraft_states():
+    print("test")
+    token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+    token_data = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
+    }
+    token_headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    token_response = requests.post(token_url, data=token_data, headers=token_headers)
+    if token_response.status_code != 200:
+        print(f"Token request failed: {token_response.status_code} - {token_response.text}")
+        return
+
+    token = token_response.json().get("access_token")
+    api_url = "https://opensky-network.org/api/states/all"
+    api_headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    api_params = {
+        "icao24": ",".join(list(icao_to_reg.keys()))
+    }
+    api_response = requests.get(api_url, headers=api_headers, params=api_params)
+    if api_response.status_code != 200:
+        print(f"Open Sky API request failed: {api_response.status_code} - {api_response.text}")
+        return
+    else:
+        print("Open Sky API request successful")
+    data = api_response.json()
+    if data.get("states") is None:
+        return
+
+    now = int(time.time())
+
+    for item in data["states"]:
+        icao24 = item[0]
+        if icao24 in last_seen_times and now - last_seen_times[icao24] > 28800:
+            reg = icao_to_reg[icao24]
+            message = f"🚀 Starship {reg} has been spotted!\nhttps://globe.adsbexchange.com/?icao={icao24}"
+            await send_alert_to_guilds(message)
+            last_seen_times[icao24] = now
+
 async def dm_owner_setup_message(guild: discord.Guild):
     try:
         # cast so Pyright knows this method exists
@@ -79,13 +122,24 @@ async def dm_owner_setup_message(guild: discord.Guild):
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user} ({bot.user.id})", flush=True)# type: ignore
-    await bot.tree.sync()
-    for guild in bot.guilds:
-        guild_id = str(guild.id)
-        if guild_id not in channel_config:
-            await dm_owner_setup_message(guild)
-    check_aircraft_states.start()
+    print(f"Logged in as {bot.user} ({bot.user.id})", flush=True)
+    try:
+        await bot.tree.sync()
+        print("Synced commands.", flush=True)
+
+        for guild in bot.guilds:
+            guild_id = str(guild.id)
+            if guild_id not in channel_config:
+                await dm_owner_setup_message(guild)
+
+        if not check_aircraft_states.is_running():
+            print("Starting check_aircraft_states loop...", flush=True)
+            check_aircraft_states.start()
+        else:
+            print("Loop already running", flush=True)
+
+    except Exception as e:
+        print(f"Error in on_ready: {e}", flush=True)
 
 @bot.event
 async def on_guild_join(guild):
@@ -150,49 +204,5 @@ async def send_alert_to_guilds(message: str):
             except Exception as e:
                 print(f"Failed to send message in {guild.name}: {e}")
 
-@tasks.loop(seconds=90)
-async def check_aircraft_states():
-    print("test")
-    token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-    token_data = {
-        "grant_type": "client_credentials",
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET
-    }
-    token_headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    token_response = requests.post(token_url, data=token_data, headers=token_headers)
-    if token_response.status_code != 200:
-        print(f"Token request failed: {token_response.status_code} - {token_response.text}")
-        return
-
-    token = token_response.json().get("access_token")
-    api_url = "https://opensky-network.org/api/states/all"
-    api_headers = {
-        "Authorization": f"Bearer {token}"
-    }
-    api_params = {
-        "icao24": ",".join(list(icao_to_reg.keys()))
-    }
-    api_response = requests.get(api_url, headers=api_headers, params=api_params)
-    if api_response.status_code != 200:
-        print(f"Open Sky API request failed: {api_response.status_code} - {api_response.text}")
-        return
-    else:
-        print("Open Sky API request successful")
-    data = api_response.json()
-    if data.get("states") is None:
-        return
-
-    now = int(time.time())
-
-    for item in data["states"]:
-        icao24 = item[0]
-        if icao24 in last_seen_times and now - last_seen_times[icao24] > 28800:
-            reg = icao_to_reg[icao24]
-            message = f"🚀 Starship {reg} has been spotted!\nhttps://globe.adsbexchange.com/?icao={icao24}"
-            await send_alert_to_guilds(message)
-            last_seen_times[icao24] = now
 
 bot.run(DISCORD_TOKEN)
