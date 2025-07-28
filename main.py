@@ -25,6 +25,8 @@ print(DISCORD_TOKEN)
 
 CONFIG_PATH = "channel_config.json"
 
+print("Bot script started", flush=True)
+
 def load_config():
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r") as f:
@@ -77,7 +79,7 @@ async def dm_owner_setup_message(guild: discord.Guild):
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user} ({bot.user.id})")# type: ignore
+    print(f"Logged in as {bot.user} ({bot.user.id})", flush=True)# type: ignore
     await bot.tree.sync()
     for guild in bot.guilds:
         guild_id = str(guild.id)
