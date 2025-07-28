@@ -8,6 +8,7 @@ import json
 from dotenv import load_dotenv
 from keep_alive import keep_alive
 from typing import cast
+import functools
 
 keep_alive()
 load_dotenv()
@@ -64,9 +65,22 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
+# Decorator to safely handle interactions and suppress expired interaction errors
+def safe_interaction_handler(func):
+    @functools.wraps(func)
+    async def wrapper(interaction: discord.Interaction, *args, **kwargs):
+        try:
+            await func(interaction, *args, **kwargs)
+        except discord.NotFound:
+            # Interaction expired or already responded to, safe to ignore
+            print(f"⚠️ Interaction expired or not found for command '{interaction.command.name}'", flush=True)
+        except Exception as e:
+            print(f"❌ Unexpected error in command '{interaction.command.name}': {e}", flush=True)
+    return wrapper
+
 @tasks.loop(seconds=90)
 async def check_aircraft_states():
-    print("test")
+    print("test", flush=True)
     token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
     token_data = {
         "grant_type": "client_credentials",
@@ -78,7 +92,7 @@ async def check_aircraft_states():
     }
     token_response = requests.post(token_url, data=token_data, headers=token_headers)
     if token_response.status_code != 200:
-        print(f"Token request failed: {token_response.status_code} - {token_response.text}")
+        print(f"Token request failed: {token_response.status_code} - {token_response.text}", flush=True)
         return
 
     token = token_response.json().get("access_token")
@@ -91,10 +105,10 @@ async def check_aircraft_states():
     }
     api_response = requests.get(api_url, headers=api_headers, params=api_params)
     if api_response.status_code != 200:
-        print(f"Open Sky API request failed: {api_response.status_code} - {api_response.text}")
+        print(f"Open Sky API request failed: {api_response.status_code} - {api_response.text}", flush=True)
         return
     else:
-        print("Open Sky API request successful")
+        print("Open Sky API request successful", flush=True)
     data = api_response.json()
     if data.get("states") is None:
         return
@@ -112,13 +126,13 @@ async def check_aircraft_states():
 async def dm_owner_setup_message(guild: discord.Guild):
     try:
         # cast so Pyright knows this method exists
-        owner = await bot.fetch_user(guild.owner_id)# type: ignore
+        owner = await bot.fetch_user(guild.owner_id)  # type: ignore
         await owner.send(
             f"👋 Hi! I noticed you haven't set a channel for aircraft alerts in **{guild.name}** yet.\n"
             "Please run the `/setchannel` command in the channel you want me to post alerts to."
         )
     except discord.Forbidden:
-        print(f"Can't DM the owner of guild {guild.name} ({guild.id})")
+        print(f"Can't DM the owner of guild {guild.name} ({guild.id})", flush=True)
 
 @bot.event
 async def on_ready():
@@ -148,11 +162,10 @@ async def on_guild_join(guild):
         await dm_owner_setup_message(guild)
 
 @tree.command(name="setchannel", description="Set this channel for aircraft alerts")
+@safe_interaction_handler
 async def setchannel(interaction: discord.Interaction):
-
     await interaction.response.defer(ephemeral=True)
 
-    
     if interaction.guild is None:
         await interaction.followup.send("❌ This command can only be used in a server.", ephemeral=True)
         return
@@ -167,14 +180,16 @@ async def setchannel(interaction: discord.Interaction):
         return
 
     guild_id = str(interaction.guild.id)
-    channel_config[guild_id] = interaction.channel.id # type: ignore
+    channel_config[guild_id] = interaction.channel.id  # type: ignore
     save_config(channel_config)
 
     await interaction.followup.send("✅ This channel has been set for aircraft alerts.", ephemeral=True)
 
 @tree.command(name="getchannel", description="Get the current aircraft alerts channel")
+@safe_interaction_handler
 async def getchannel(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
+
     if interaction.guild is None:
         await interaction.followup.send("❌ This command can only be used in a server.", ephemeral=True)
         return
@@ -202,7 +217,7 @@ async def send_alert_to_guilds(message: str):
             try:
                 await channel.send(message)  # type: ignore
             except Exception as e:
-                print(f"Failed to send message in {guild.name}: {e}")
+                print(f"Failed to send message in {guild.name}: {e}", flush=True)
 
 
 bot.run(DISCORD_TOKEN)
