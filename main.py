@@ -80,7 +80,6 @@ def safe_interaction_handler(func):
 
 @tasks.loop(seconds=90)
 async def check_aircraft_states():
-    print("test", flush=True)
     token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
     token_data = {
         "grant_type": "client_credentials",
