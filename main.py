@@ -95,29 +95,34 @@ async def on_guild_join(guild):
 
 @tree.command(name="setchannel", description="Set this channel for aircraft alerts")
 async def setchannel(interaction: discord.Interaction):
+
+    await interaction.response.defer(ephemeral=True)
+
+    
     if interaction.guild is None:
-        await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+        await interaction.followup.send("❌ This command can only be used in a server.", ephemeral=True)
         return
 
     # user can be User or Member; ensure Member to access guild_permissions
     if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message("❌ Unable to verify permissions.", ephemeral=True)
+        await interaction.followup.send("❌ Unable to verify permissions.", ephemeral=True)
         return
 
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Only administrators can use this command.", ephemeral=True)
+        await interaction.followup.send("❌ Only administrators can use this command.", ephemeral=True)
         return
 
     guild_id = str(interaction.guild.id)
     channel_config[guild_id] = interaction.channel.id # type: ignore
     save_config(channel_config)
 
-    await interaction.response.send_message("✅ This channel has been set for aircraft alerts.", ephemeral=True)
+    await interaction.followup.send("✅ This channel has been set for aircraft alerts.", ephemeral=True)
 
 @tree.command(name="getchannel", description="Get the current aircraft alerts channel")
 async def getchannel(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     if interaction.guild is None:
-        await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+        await interaction.followup.send("❌ This command can only be used in a server.", ephemeral=True)
         return
 
     guild_id = str(interaction.guild.id)
@@ -126,11 +131,11 @@ async def getchannel(interaction: discord.Interaction):
     if channel_id:
         channel = interaction.guild.get_channel(channel_id)
         if channel:
-            await interaction.response.send_message(f"📢 The current alerts channel is {channel.mention}.", ephemeral=True)
+            await interaction.followup.send(f"📢 The current alerts channel is {channel.mention}.", ephemeral=True)
         else:
-            await interaction.response.send_message("⚠️ The saved channel no longer exists.", ephemeral=True)
+            await interaction.followup.send("⚠️ The saved channel no longer exists.", ephemeral=True)
     else:
-        await interaction.response.send_message("ℹ️ No alerts channel has been set yet. Use `/setchannel` to set one.", ephemeral=True)
+        await interaction.followup.send("ℹ️ No alerts channel has been set yet. Use `/setchannel` to set one.", ephemeral=True)
 
 async def send_alert_to_guilds(message: str):
     for guild in bot.guilds:
